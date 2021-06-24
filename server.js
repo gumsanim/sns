@@ -17,6 +17,8 @@ app.use(passport.session());
 var db;
 
 const MongoClient = require("mongodb").MongoClient;
+const { send } = require("process");
+const { resolveSoa } = require("dns");
 MongoClient.connect(process.env.DB_URL,
 function(err,res){
     if(err){
@@ -170,6 +172,7 @@ app.post("/detail/like",loginCheck,function(req,res){
                 if(error) return console.log(error);
                 db.collection("post").updateOne({_id:id},{$pull:{likeUser:req.user.id}},function(error,result){
                     if(error) return console.log(error);
+                    
                 })
            })
         } else {
@@ -177,6 +180,7 @@ app.post("/detail/like",loginCheck,function(req,res){
                 if(error) return console.log(error);
                 db.collection("post").updateOne({_id:id},{$push:{likeUser:req.user.id}},function(error,result){
                     if(error) return console.log(error);
+                    
                 })
            })   
         }
@@ -184,7 +188,7 @@ app.post("/detail/like",loginCheck,function(req,res){
 })
 
 
-app.post("/delete",loginCheck,function(req,res){
+app.post("/deletepost",loginCheck,function(req,res){
     let id = parseInt(req.body.id);
     db.collection("post").findOne({_id:id},function(error,result){
         if(error) return console.log(error);
@@ -196,5 +200,38 @@ app.post("/delete",loginCheck,function(req,res){
         } else {
             res.send("삭제 권한이 없습니다.");
         }
+    })
+})
+
+
+app.post("/updatepost",loginCheck,function(req,res){
+    let id = parseInt(req.body.id);
+    db.collection("post").findOne({_id:id},function(error,result){
+        if(error) return console.log(error);
+        if(result.user==req.user.id){
+            res.send("일치");
+        } else {
+            res.send("불일치");
+        }
+    })
+})
+
+// app.post("/updatepost/getpost",loginCheck,function(req,res){
+//     let id = parseInt(req.body.id);
+//     console.log(id)
+//     db.collection("post").findOne({_id:id},function(error,result){
+//         if(error) return console.log(error);
+//         console.log(result);
+//         res.send(result);
+//     })
+// })
+
+app.post("/updatepost/update",loginCheck,function(req,res){
+    let id = parseInt(req.body.id);
+    let title = req.body.title;
+    let content = req.body.content;
+    db.collection("post").updateOne({_id:id},{$set:{title:title, content:content}},function(error,result){
+        if(error) return console.log(error);
+        res.send("수정이 완료되었습니다.");
     })
 })
