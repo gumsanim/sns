@@ -235,3 +235,16 @@ app.post("/updatepost/update",loginCheck,function(req,res){
         res.send("수정이 완료되었습니다.");
     })
 })
+
+app.post("/detailcomment",loginCheck,function(req,res){
+    let id = parseInt(req.body.id);
+    let comment = req.body.comment;
+    let commentUser = req.user.id;
+    db.collection("post").updateOne({_id:id},{$push:{comment:comment}},function(error,result){
+        if(error) return console.log(error);
+        db.collection("post").updateOne({_id:id},{$push:{commentUser:commentUser}},function(error,result){
+            if(error) return console.log(error);
+            res.send(result);
+        })
+    })
+})
