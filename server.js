@@ -5,6 +5,7 @@ const bodyParser = require("body-parser");
 const passport = require("passport");
 const session = require("express-session");
 const LocalStrategy = require("passport-local").Strategy;
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 
 app.use(bodyParser.json());
@@ -12,13 +13,11 @@ app.use(bodyParser.urlencoded({extended:true}));
 app.use(session({secret:"secretCode", resave: true, saveUninitialized: false}));
 app.use(passport.initialize());
 app.use(passport.session());
-
+app.use(cookieParser());
 
 var db;
-
 const MongoClient = require("mongodb").MongoClient;
-const { send } = require("process");
-const { resolveSoa } = require("dns");
+
 MongoClient.connect(process.env.DB_URL,
 function(err,res){
     if(err){
@@ -89,7 +88,6 @@ passport.use(new LocalStrategy({
     session: true,
     passReqToCallback: false,
   }, function (inputId, inputPw, done) {
-    //console.log(입력한아이디, 입력한비번);
     db.collection('user').findOne({ id: inputId }, function (error, result) {
       if (error) return done(error)
       if (!result) return done(null, false, { message: "id not found" })
@@ -125,7 +123,7 @@ app.post("/detail/getpost",loginCheck,function(req,res){
     })
 })
 
-app.post("/write/addpost",loginCheck,function(req,res){
+app.post("/write/addpost",loginCheck, function(req,res){
     console.log(req.user.id)
     console.log(req.body.title)
     console.log(req.body.content)
@@ -157,36 +155,35 @@ app.post("/write/addpost",loginCheck,function(req,res){
             db.collection("post-count").updateOne({name:"postcount"},{$inc:{count:1}},function(error,result){
                 if(error) return console.log(error);
                 console.log(result);
+
             })
         })
     })
 })
 
-
-app.post("/detail/like",loginCheck,function(req,res){
+app.post("/detail/like",loginCheck, async function(req,res){
     let id = parseInt(req.body.id);
-    db.collection("post").findOne({_id:id},function(error,result){
+    db.collection("post").findOne({_id:id}, function(error,result){
         if(error) return console.log(error);
         if(result.likeUser.includes(req.user.id)){
-           db.collection("post").updateOne({_id:id},{$inc:{like:-1}},function(error,result){
+           db.collection("post").updateOne({_id:id},{$inc:{like:-1}}, function(error,result){
                 if(error) return console.log(error);
-                db.collection("post").updateOne({_id:id},{$pull:{likeUser:req.user.id}},function(error,result){
+               db.collection("post").updateOne({_id:id},{$pull:{likeUser:req.user.id}},function(error,result){
                     if(error) return console.log(error);
-                    
+                    res.send("noLike");
                 })
            })
         } else {
-            db.collection("post").updateOne({_id:id},{$inc:{like:1}},function(error,result){
+            db.collection("post").updateOne({_id:id},{$inc:{like:1}}, function(error,result){
                 if(error) return console.log(error);
                 db.collection("post").updateOne({_id:id},{$push:{likeUser:req.user.id}},function(error,result){
                     if(error) return console.log(error);
-                    
-                })
+                    res.send("like");
+                })  
            })   
         }
     })
 })
-
 
 app.post("/deletepost",loginCheck,function(req,res){
     let id = parseInt(req.body.id);
@@ -203,7 +200,6 @@ app.post("/deletepost",loginCheck,function(req,res){
     })
 })
 
-
 app.post("/updatepost",loginCheck,function(req,res){
     let id = parseInt(req.body.id);
     db.collection("post").findOne({_id:id},function(error,result){
@@ -215,16 +211,6 @@ app.post("/updatepost",loginCheck,function(req,res){
         }
     })
 })
-
-// app.post("/updatepost/getpost",loginCheck,function(req,res){
-//     let id = parseInt(req.body.id);
-//     console.log(id)
-//     db.collection("post").findOne({_id:id},function(error,result){
-//         if(error) return console.log(error);
-//         console.log(result);
-//         res.send(result);
-//     })
-// })
 
 app.post("/updatepost/update",loginCheck,function(req,res){
     let id = parseInt(req.body.id);
@@ -248,3 +234,43 @@ app.post("/detailcomment",loginCheck,function(req,res){
         })
     })
 })
+
+app.post("/deletecomment",loginCheck, function(req,res){
+    let user = req.user.id; 
+    let id = req.body.id  
+    let idx = req.body.idx; 
+    db.collection("post").findOne({_id:id},function(error,result){
+        if(error) return console.log(error);
+        if(result.commentUser[idx]===user){
+           db.collection("post").findOne({_id:id},function(error,result){
+            if(error) return console.log(error);   
+            let commentUserArr = [...result.commentUser];
+            let commentArr = [...result.comment];
+            commentUserArr.splice(idx,1);
+            commentArr.splice(idx,1);
+            db.collection("post").updateOne({_id:id},{$set:{commentUser:commentUserArr}},function(error,result){
+                if(error) return console.log(error);
+                db.collection("post").updateOne({_id:id},{$set:{comment:commentArr}},function(error,result){
+                    if(error) return console.log(error);
+                    res.send("댓글 삭제 완료");
+                })
+            })
+           })
+        }else{
+            res.send("댓글 삭제 권한이 없습니다");
+        }
+    })
+})
+
+app.post("/logout",loginCheck,function(req,res){
+    if(req.user){
+        req.session.destroy(function(error){
+            if(error) return console.log(error)
+            res.send("로그아웃 완료");
+        })
+    }
+})
+
+
+
+
